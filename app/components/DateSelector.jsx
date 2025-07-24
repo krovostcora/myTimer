@@ -6,24 +6,40 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 export default function DateSelector({ selectedDate, onSelect }) {
     const [showPicker, setShowPicker] = useState(false);
 
-    const formatDate = (date) => {
-        return date.toLocaleDateString('en-GB'); // DD/MM/YYYY
+    const formatDate = (date) => date.toLocaleDateString('en-GB');
+
+    const isToday = (date) => {
+        const now = new Date();
+        return (
+            date.getDate() === now.getDate() &&
+            date.getMonth() === now.getMonth() &&
+            date.getFullYear() === now.getFullYear()
+        );
+    };
+
+    const handlePress = () => {
+        if (isToday(selectedDate) && showPicker) {
+            setShowPicker(false);
+        } else {
+            setShowPicker(true);
+        }
     };
 
     return (
         <View style={styles.wrapper}>
-            <TouchableOpacity onPress={() => setShowPicker(true)} style={styles.dateButton}>
+            <TouchableOpacity onPress={handlePress} style={styles.dateButton}>
                 <Text style={styles.dateText}>{formatDate(selectedDate)}</Text>
             </TouchableOpacity>
 
             {showPicker && (
                 <DateTimePicker
+                    themeVariant="dark"
                     value={selectedDate}
                     mode="date"
                     display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                     onChange={(e, date) => {
                         if (date) {
-                            onSelect(date); // просто викликати
+                            onSelect(date);
                         }
                         setShowPicker(false);
                     }}
@@ -44,10 +60,9 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         paddingHorizontal: 20,
         borderRadius: 10,
-        // backgroundColor: '#1e3a5f',
     },
     dateText: {
         color: '#fff',
-        fontSize: 16,
+        fontSize: 30,
     },
 });

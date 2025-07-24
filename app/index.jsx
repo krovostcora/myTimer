@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, Dimensions } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateSelector from './components/DateSelector';
 import TimerButton from './components/TimerButton';
@@ -12,7 +13,7 @@ const formatDateKey = (date) => {
     const m = String(date.getMonth() + 1).padStart(2, '0');
     const d = String(date.getDate()).padStart(2, '0');
     return `${y}-${m}-${d}`;
-    };
+};
 const formatTime = (date) => date.toTimeString().slice(0, 5);
 
 export default function App() {
@@ -144,31 +145,35 @@ export default function App() {
     const total = sumDurations(entries);
 
     return (
-        <View style={styles.container}>
-            <DateSelector selectedDate={selectedDate} onSelect={onSelectDate} />
-            {isToday(selectedDate) && (
-                <TimerButton
-                    isTracking={isTracking}
-                    running={running}
-                    disabled={false}
-                    onToggle={toggleTracking}
+        <LinearGradient
+            colors={['#130629', '#716a1c']}
+            style={styles.container}
+        >
+            {/*<View style={styles.container}>*/}
+                <DateSelector selectedDate={selectedDate} onSelect={onSelectDate} />
+                {isToday(selectedDate) && (
+                    <TimerButton
+                        isTracking={isTracking}
+                        running={running}
+                        disabled={false}
+                        onToggle={toggleTracking}
+                    />
+                )}
+                <LogsList
+                    entries={entries}
+                    calcDuration={calcDuration}
+                    formatTime={formatTime}
+                    total={total}
+                    maxHeight={height * 0.3}
                 />
-            )}
-            <LogsList
-                entries={entries}
-                calcDuration={calcDuration}
-                formatTime={formatTime}
-                total={total}
-                maxHeight={height * 0.3}
-            />
-        </View>
+            {/*</View>*/}
+        </LinearGradient>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#130629',
         paddingTop: 50,
         alignItems: 'center',
     },

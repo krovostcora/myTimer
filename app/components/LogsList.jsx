@@ -1,6 +1,6 @@
-// app/components/LogsList.jsx
 import React from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { BlurView } from 'expo-blur';
 
 export default function LogsList({
                                      entries,
@@ -9,7 +9,6 @@ export default function LogsList({
                                      total,
                                      maxHeight,
                                  }) {
-    // Calculate total from valid logs
     const validLogs = entries.filter(log => {
         const start = new Date(log.start);
         const end = new Date(log.end);
@@ -33,6 +32,8 @@ export default function LogsList({
 
     return (
         <View style={[styles.box, { maxHeight }]}>
+            <BlurView intensity={30} tint="light" style={StyleSheet.absoluteFill} />
+            <View style={styles.overlay} />
             <ScrollView contentContainerStyle={{ paddingBottom: 12 }}>
                 {entries.length === 0 && (
                     <Text style={styles.noLogs}>No logs for this day</Text>
@@ -60,30 +61,44 @@ export default function LogsList({
         </View>
     );
 }
+
 const styles = StyleSheet.create({
     box: {
         width: '90%',
-        borderRadius: 18,
-        backgroundColor: '#1B335A',
-        paddingHorizontal: 16,
+        borderRadius: 26,
+        overflow: 'hidden',
+        paddingHorizontal: 18,
         paddingTop: 16,
         paddingBottom: 8,
+        borderWidth: 0.3,
+        borderColor: 'transparent',
+        shadowColor: '#160932',
+        shadowOpacity: 0.12,
+        shadowRadius: 16,
+        shadowOffset: { width: 0, height: 8 },
+        backgroundColor: 'rgba(255,255,255,0.12)',
+        marginBottom: 24,
+    },
+    overlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(255,255,255,0.10)',
+        borderRadius: 18,
     },
     row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
     time: { color: '#D8E3F0', fontWeight: '600', fontSize: 16 },
-    dur: { color: '#A3B4CC', fontWeight: '600', fontSize: 16 },
+    dur: { color: '#26232e', fontWeight: '600', fontSize: 18 },
     noLogs: {
-        color: '#AAC8FF',
+        color: '#160932',
         fontWeight: '600',
-        fontSize: 14,
+        fontSize: 20,
         textAlign: 'center',
         marginVertical: 16,
     },
     total: {
         marginTop: 8,
-        color: '#AAD8FF',
+        color: '#160932',
         fontWeight: '700',
-        fontSize: 16,
+        fontSize: 20,
         textAlign: 'right',
     },
 });
