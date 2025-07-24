@@ -1,8 +1,8 @@
 {
   "expo": {
     "scheme": "app",
-    "name": "events__app",
-    "slug": "events__app",
+    "name": "my timer",
+    "slug": "my_timer",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
