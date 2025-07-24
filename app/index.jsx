@@ -1,212 +1,179 @@
-// app/index.jsx
-import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Dimensions, ScrollView, Animated } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, StyleSheet, Dimensions } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import DateSelector from './components/DateSelector';
+import TimerButton from './components/TimerButton';
+import LogsList from './components/LogsList';
 
-const { width, height } = Dimensions.get('window');
+const { height } = Dimensions.get('window');
+
+const formatDateKey = (date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+    };
+const formatTime = (date) => date.toTimeString().slice(0, 5);
 
 export default function App() {
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [timeLogs, setTimeLogs] = useState({});
     const [isTracking, setIsTracking] = useState(false);
     const [startTime, setStartTime] = useState(null);
-    const [now, setNow] = useState(new Date());
-    const intervalRef = useRef(null);
-    const scaleAnim = useRef(new Animated.Value(1)).current;
-
-    const formatDateKey = (date) => date.toISOString().split('T')[0];
-
-    const handlePressIn = () => {
-        Animated.spring(scaleAnim, {
-            toValue: 0.9,
-            useNativeDriver: true,
-        }).start();
-    };
-
-    const handlePressOut = () => {
-        Animated.spring(scaleAnim, {
-            toValue: 1,
-            useNativeDriver: true,
-        }).start();
-    };
+    const [running, setRunning] = useState({ hrs: 0, mins: 0, secs: 0 });
 
     const todayKey = formatDateKey(new Date());
     const selectedKey = formatDateKey(selectedDate);
+    const prevDateRef = useRef(selectedDate);
+
+    const isToday = (date) => {
+        const now = new Date();
+        return (
+            date.getDate() === now.getDate() &&
+            date.getMonth() === now.getMonth() &&
+            date.getFullYear() === now.getFullYear()
+        );
+    };
 
     useEffect(() => {
         const loadLogs = async () => {
-            try {
-                const stored = await AsyncStorage.getItem('timeLogs');
-                if (stored) setTimeLogs(JSON.parse(stored));
-            } catch (e) {
-                console.log('Failed to load logs', e);
+            const stored = await AsyncStorage.getItem('timeLogs');
+            if (stored) {
+                const logs = JSON.parse(stored);
+                setTimeLogs(logs);
+
+                const todayLogs = logs[todayKey] || [];
+                const last = todayLogs[todayLogs.length - 1];
+                if (last && !last.end) {
+                    setIsTracking(true);
+                    setStartTime(new Date(last.start));
+                }
             }
         };
         loadLogs();
     }, []);
 
     useEffect(() => {
-        if (isTracking) {
-            intervalRef.current = setInterval(() => setNow(new Date()), 1000);
+        let interval;
+        if (isTracking && startTime) {
+            interval = setInterval(() => {
+                const now = new Date();
+                const duration = calcDuration(startTime, now);
+                setRunning(duration);
+            }, 1000);
         } else {
-            clearInterval(intervalRef.current);
+            setRunning({ hrs: 0, mins: 0, secs: 0 });
         }
-        return () => clearInterval(intervalRef.current);
-    }, [isTracking]);
+        return () => clearInterval(interval);
+    }, [isTracking, startTime]);
 
-    const formatTime = (date) => date.toTimeString().slice(0, 5);
+    useEffect(() => {
+        const prevDate = prevDateRef.current;
 
-    const getToday = () => {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        return today;
-    };
-
-    const getDateRange = () => {
-        const center = getToday();
-        const range = [];
-        for (let i = -2; i <= 2; i++) {
-            const d = new Date(center);
-            d.setDate(center.getDate() + i);
-            range.push(d);
-        }
-        return range;
-    };
-
-    const calcDuration = (start, end) => {
-        if (!start || !end || isNaN(start) || isNaN(end)) return { hrs: 0, mins: 0, secs: 0 };
-        const ms = end - start;
-        if (ms <= 0) return { hrs: 0, mins: 0, secs: 0 };
-        const secsTotal = Math.floor(ms / 1000);
-        const hrs = Math.floor(secsTotal / 3600);
-        const mins = Math.floor((secsTotal % 3600) / 60);
-        const secs = secsTotal % 60;
-        return { hrs, mins, secs };
-    };
-
-    const getTotalTime = (entries) => {
-        return entries.reduce(
-            (acc, { start, end }) => {
-                const { hrs, mins } = calcDuration(new Date(start), new Date(end));
-                return {
-                    hrs: acc.hrs + hrs,
-                    mins: acc.mins + mins,
-                };
-            },
-            { hrs: 0, mins: 0 }
-        );
-    };
-
-    const normalizeTime = ({ hrs, mins }) => {
-        const totalMins = hrs * 60 + mins;
-        return {
-            hrs: Math.floor(totalMins / 60),
-            mins: totalMins % 60,
-        };
-    };
-
-    const handleToggle = async () => {
-        if (selectedKey !== todayKey) return;
-        if (!isTracking) {
-            const start = new Date();
-            setStartTime(start);
-            setIsTracking(true);
-        } else if (startTime) {
-            const endTime = new Date();
-            const newEntry = {
-                start: startTime.toISOString(),
-                end: endTime.toISOString(),
+        // Якщо переключаєшся з "сьогодні" на іншу дату — зберігаємо лог
+        if (isTracking && isToday(prevDate) && !isToday(selectedDate)) {
+            const end = new Date();
+            const newEntry = { start: startTime, end };
+            const updatedLogs = {
+                ...timeLogs,
+                [formatDateKey(prevDate)]: [...(timeLogs[formatDateKey(prevDate)] || []), newEntry],
             };
-            const prevLogs = timeLogs[selectedKey] || [];
-            const updatedLogs = { ...timeLogs, [selectedKey]: [...prevLogs, newEntry] };
             setTimeLogs(updatedLogs);
-            try {
-                await AsyncStorage.setItem('timeLogs', JSON.stringify(updatedLogs));
-            } catch (e) {
-                console.log('Failed to save logs', e);
-            }
+            AsyncStorage.setItem('timeLogs', JSON.stringify(updatedLogs));
             setIsTracking(false);
             setStartTime(null);
         }
+
+        // Якщо повертаємось на "сьогодні", перевіряємо незавершений лог
+        if (isToday(selectedDate)) {
+            const todayLogs = timeLogs[todayKey] || [];
+            const last = todayLogs[todayLogs.length - 1];
+            if (last && !last.end) {
+                setIsTracking(true);
+                setStartTime(new Date(last.start));
+            }
+        }
+
+        prevDateRef.current = selectedDate;
+    }, [selectedDate]);
+
+    const onSelectDate = (date) => {
+        setSelectedDate(date);
+    };
+
+    const toggleTracking = async () => {
+        if (selectedKey !== todayKey) return;
+
+        if (!isTracking) {
+            const now = new Date();
+            setStartTime(now);
+            setIsTracking(true);
+            return;
+        }
+
+        const end = new Date();
+        const newEntry = { start: startTime, end };
+        const updatedLogs = {
+            ...timeLogs,
+            [selectedKey]: [...(timeLogs[selectedKey] || []), newEntry],
+        };
+        setTimeLogs(updatedLogs);
+        await AsyncStorage.setItem('timeLogs', JSON.stringify(updatedLogs));
+        setIsTracking(false);
+        setStartTime(null);
+    };
+
+    const calcDuration = (start, end) => {
+        if (!start || !end) return { hrs: 0, mins: 0, secs: 0 };
+        const startDate = new Date(start);
+        const endDate = new Date(end);
+        const diffMs = endDate - startDate;
+        if (diffMs < 0) return { hrs: 0, mins: 0, secs: 0 };
+        const totalSecs = Math.floor(diffMs / 1000);
+        const hrs = Math.floor(totalSecs / 3600);
+        const mins = Math.floor((totalSecs % 3600) / 60);
+        const secs = totalSecs % 60;
+        return { hrs, mins, secs };
+    };
+
+    const sumDurations = (arr) => {
+        return arr.reduce(
+            (acc, cur) => {
+                const dur = calcDuration(cur.start, cur.end ?? new Date());
+                let totalSecsAcc = acc.hrs * 3600 + acc.mins * 60 + acc.secs;
+                let totalSecsCur = dur.hrs * 3600 + dur.mins * 60 + dur.secs;
+                let sumSecs = totalSecsAcc + totalSecsCur;
+                return {
+                    hrs: Math.floor(sumSecs / 3600),
+                    mins: Math.floor((sumSecs % 3600) / 60),
+                    secs: sumSecs % 60,
+                };
+            },
+            { hrs: 0, mins: 0, secs: 0 }
+        );
     };
 
     const entries = timeLogs[selectedKey] || [];
-    const total = normalizeTime(getTotalTime(entries));
-    const running = isTracking ? calcDuration(startTime, now) : { hrs: 0, mins: 0, secs: 0 };
-    const totalDuration = normalizeTime({
-        hrs: total.hrs + running.hrs,
-        mins: total.mins + running.mins,
-    });
+    const total = sumDurations(entries);
 
     return (
         <View style={styles.container}>
-            <FlatList
-                horizontal
-                data={getDateRange()}
-                keyExtractor={(item) => item.toISOString()}
-                contentContainerStyle={styles.dateList}
-                showsHorizontalScrollIndicator={false}
-                renderItem={({ item }) => {
-                    const isSelected = formatDateKey(item) === selectedKey;
-                    const dayName = item.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 3);
-                    const day = item.getDate();
-                    const month = item.getMonth() + 1;
-                    return (
-                        <TouchableOpacity
-                            onPress={() => setSelectedDate(item)}
-                            style={[styles.dateItem, isSelected && styles.dateItemSelected]}
-                        >
-                            <Text style={[styles.dayText, isSelected && styles.selectedText]}>{dayName}</Text>
-                            <Text style={[styles.dateText, isSelected && styles.selectedText]}>{`${day}.${month}`}</Text>
-                        </TouchableOpacity>
-                    );
-                }}
+            <DateSelector selectedDate={selectedDate} onSelect={onSelectDate} />
+            {isToday(selectedDate) && (
+                <TimerButton
+                    isTracking={isTracking}
+                    running={running}
+                    disabled={false}
+                    onToggle={toggleTracking}
+                />
+            )}
+            <LogsList
+                entries={entries}
+                calcDuration={calcDuration}
+                formatTime={formatTime}
+                total={total}
+                maxHeight={height * 0.3}
             />
-
-            <View style={styles.centerContainer}>
-                <Animated.View style={[styles.circle, { transform: [{ scale: scaleAnim }] }]}>
-                    <TouchableOpacity
-                        onPressIn={handlePressIn}
-                        onPressOut={handlePressOut}
-                        onPress={handleToggle}
-                        activeOpacity={0.8}
-                        disabled={selectedKey !== todayKey}
-                    >
-                        <Text style={styles.timerText}>
-                            {isTracking
-                                ? `${String(running.hrs).padStart(2, '0')}:${String(running.mins).padStart(2, '0')}:${String(running.secs).padStart(2, '0')}`
-                                : 'START'}
-                        </Text>
-                    </TouchableOpacity>
-                </Animated.View>
-            </View>
-
-            <View style={styles.logsContainer}>
-                <ScrollView style={styles.logsScroll} contentContainerStyle={{ paddingBottom: 12 }}>
-                    {entries.length === 0 && (
-                        <Text style={styles.noLogsText}>No logs for this day</Text>
-                    )}
-                    {entries.map(({ start, end }, index) => {
-                        const { hrs, mins } = calcDuration(new Date(start), new Date(end));
-                        return (
-                            <View key={index} style={styles.logEntry}>
-                                <Text style={styles.logText}>
-                                    {formatTime(new Date(start))} - {formatTime(new Date(end))}
-                                </Text>
-                                <Text style={styles.durationText}>
-                                    {hrs > 0 ? `${hrs} hr${hrs > 1 ? 's' : ''}` : ''} {mins > 0 ? `${mins} min` : ''}
-                                </Text>
-                            </View>
-                        );
-                    })}
-                </ScrollView>
-
-                {entries.length > 0 && (
-                    <Text style={styles.totalText}>
-                        Total: {totalDuration.hrs} hr{totalDuration.hrs !== 1 ? 's' : ''}, {totalDuration.mins} min
-                    </Text>
-                )}
-            </View>
         </View>
     );
 }
@@ -217,112 +184,5 @@ const styles = StyleSheet.create({
         backgroundColor: '#0B1D3A',
         paddingTop: 50,
         alignItems: 'center',
-    },
-    dateList: {
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        gap: 12,
-    },
-    dateItem: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: width / 6,
-        height: 70,
-        borderRadius: 16,
-        backgroundColor: '#1B335A',
-        borderWidth: 1,
-        borderColor: 'transparent',
-        shadowColor: '#000',
-        shadowOpacity: 0.15,
-        shadowRadius: 8,
-        shadowOffset: { width: 0, height: 2 },
-    },
-    dateItemSelected: {
-        backgroundColor: '#4A90E2',
-        borderColor: '#AAD8FF',
-        shadowOpacity: 0.3,
-        shadowRadius: 12,
-    },
-    dayText: {
-        fontSize: 14,
-        color: '#D8E3F0',
-        fontWeight: '600',
-    },
-    dateText: {
-        fontSize: 16,
-        color: '#D8E3F0',
-        fontWeight: '700',
-        marginTop: 4,
-    },
-    selectedText: {
-        color: '#FFF',
-        textShadowColor: 'rgba(0, 0, 0, 0.25)',
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 3,
-    },
-    centerContainer: {
-        marginVertical: 40,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    circle: {
-        width: 220,
-        height: 220,
-        borderRadius: 110,
-        backgroundColor: '#4A90E2',
-        justifyContent: 'center',
-        alignItems: 'center',
-        shadowColor: '#3B6CBD',
-        shadowOpacity: 0.7,
-        shadowRadius: 25,
-        shadowOffset: { width: 0, height: 12 },
-        elevation: 15,
-    },
-    timerText: {
-        fontSize: 42,
-        fontWeight: '800',
-        color: '#FFF',
-        letterSpacing: 2,
-    },
-    logsContainer: {
-        width: '90%',
-        maxHeight: 220,
-        borderRadius: 18,
-        backgroundColor: '#1B335A',
-        paddingHorizontal: 16,
-        paddingTop: 16,
-        paddingBottom: 12,
-    },
-    logsScroll: {
-        maxHeight: 180,
-    },
-    logEntry: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 8,
-    },
-    logText: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#D8E3F0',
-    },
-    durationText: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#A3B4CC',
-    },
-    noLogsText: {
-        color: '#AAC8FF',
-        fontWeight: '600',
-        fontSize: 14,
-        textAlign: 'center',
-        marginTop: 16,
-    },
-    totalText: {
-        marginTop: 8,
-        color: '#AAD8FF',
-        fontWeight: '700',
-        fontSize: 16,
-        textAlign: 'right',
     },
 });
