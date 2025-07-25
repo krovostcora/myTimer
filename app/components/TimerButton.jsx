@@ -57,10 +57,10 @@ const styles = StyleSheet.create({
     },
     glassOverlay: {
         ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(255,255,255,0.18)',
+        backgroundColor: 'rgba(255,255,255,0.03)',
         borderRadius: 110,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.25)',
+        borderColor: 'rgba(255,255,255,0.03)',
     },
     pressable: {
         flex: 1,

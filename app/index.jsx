@@ -36,6 +36,17 @@ export default function App() {
         );
     };
 
+    const handleDeleteLog = async (index) => {
+        const updatedEntries = [...entries];
+        updatedEntries.splice(index, 1);
+        const updatedLogs = {
+            ...timeLogs,
+            [selectedKey]: updatedEntries,
+        };
+        setTimeLogs(updatedLogs);
+        await AsyncStorage.setItem('timeLogs', JSON.stringify(updatedLogs));
+    };
+
     useEffect(() => {
         const loadLogs = async () => {
             const stored = await AsyncStorage.getItem('timeLogs');
@@ -144,6 +155,17 @@ export default function App() {
     const entries = timeLogs[selectedKey] || [];
     const total = sumDurations(entries);
 
+    const handleSaveNote = async (index, note) => {
+        const updatedEntries = [...entries];
+        updatedEntries[index] = { ...updatedEntries[index], note };
+        const updatedLogs = {
+            ...timeLogs,
+            [selectedKey]: updatedEntries,
+        };
+        setTimeLogs(updatedLogs);
+        await AsyncStorage.setItem('timeLogs', JSON.stringify(updatedLogs));
+    };
+
     return (
         <LinearGradient
             colors={['#130629', '#716a1c']}
@@ -159,13 +181,18 @@ export default function App() {
                         onToggle={toggleTracking}
                     />
                 )}
+            <View style={{ flex: 1, width: '100%' }}>
                 <LogsList
                     entries={entries}
                     calcDuration={calcDuration}
                     formatTime={formatTime}
                     total={total}
-                    maxHeight={height * 0.3}
+                    maxHeight={height * 0.4}
+                    height={height * 0.4}
+                    onDelete={handleDeleteLog}
+                    onSaveNote={handleSaveNote}
                 />
+            </View>
             {/*</View>*/}
         </LinearGradient>
     );
